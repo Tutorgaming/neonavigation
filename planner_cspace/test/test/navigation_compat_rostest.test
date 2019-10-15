@@ -2,8 +2,9 @@
 <launch>
   <param name="neonavigation_compatible" value="0" />
 
-  <test test-name="test_navigate" pkg="planner_cspace" type="test_navigate" time-limit="180.0">
+  <test test-name="test_navigate" pkg="planner_cspace" type="test_navigate" time-limit="200.0">
     <remap from="patrol_nodes" to="/patrol/path" />
+    <remap from="forget_planning_cost" to="/planner_3d/forget" />
     <remap from="map" to="/map" />
   </test>
 
@@ -12,6 +13,18 @@
     <param name="ang_resolution" value="16"/>
     <param name="linear_expand" value="0.1"/>
     <param name="linear_spread" value="0.1"/>
+    <rosparam>
+    static_layers:
+    - name: unknown
+      type: Costmap3dLayerUnknownHandle
+      unknown_cost: 100
+    layers:
+    - name: overlay
+      type: Costmap3dLayerFootprint
+      overlay_mode: max
+      linear_expand: 0.0
+      linear_spread: 0.0
+    </rosparam>
   </node>
   <node pkg="planner_cspace" type="planner_3d" name="planner_3d">
     <remap from="~/goal" to="/goal" />
@@ -19,6 +32,8 @@
     <remap from="~/costmap_update" to="/costmap_3d/costmap_update" />
     <param name="max_vel" value="0.1" />
     <param name="max_ang_vel" value="0.3" />
+    <param name="goal_tolerance_lin" value="0.025" />
+    <param name="sw_wait" value="0.2" />
   </node>
   <node pkg="trajectory_tracker" type="trajectory_tracker" name="spur">
     <remap from="~/cmd_vel" to="/cmd_vel" />
@@ -43,7 +58,6 @@
     <param name="hz" value="30.0" />
     <param name="dist_lim" value="0.5" />
 
-    <param name="distance_angle_factor" value="0.2" />
     <param name="rotate_ang" value="0.2" />
 
     <param name="goal_tolerance_dist" value="0.05" />
@@ -53,7 +67,12 @@
     <param name="no_position_control_dist" value="0.03" />
   </node>
 
-  <node pkg="map_server" type="map_server" name="map_server_global" args="$(find planner_cspace)/test/data/global_map.yaml" />
+  <node pkg="map_server" type="map_server" name="map_server_global" args="$(find planner_cspace)/test/data/global_map.yaml">
+    <remap from="map" to="map_global" />
+  </node>
+  <node pkg="map_server" type="map_server" name="map_server_local" args="$(find planner_cspace)/test/data/local_map.yaml">
+    <remap from="map" to="map_local" />
+  </node>
 
   <node pkg="planner_cspace" type="patrol" name="patrol" />
 

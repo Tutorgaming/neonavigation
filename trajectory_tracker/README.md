@@ -10,7 +10,6 @@ trajectory_tracker node controls vehicle velocity to follow given path.
 ### Subscribed topics
 
 * ~/path (new: path) [nav_msgs::Path]
-* ~/odom (new: odom) [nav_msgs::Odometry]
 * ~/speed (new: speed) [std_msgs::Float32]
 * /tf
 
@@ -30,7 +29,6 @@ trajectory_tracker node controls vehicle velocity to follow given path.
 
 * "frame_robot" (string, default: std::string("base_link"))
 * "path" **deprecated** (string, default: std::string("path"))
-* "odom" **deprecated** (string, default: std::string("odom"))
 * "cmd_vel" **deprecated** (string, default: std::string("cmd_vel"))
 * "hz" (double, default: 50.0)
 * "look_forward" (double, default: 0.5)
@@ -38,7 +36,8 @@ trajectory_tracker node controls vehicle velocity to follow given path.
 * "k_dist" (double, default: 1.0)
 * "k_ang" (double, default: 1.0)
 * "k_avel" (double, default: 1.0)
-* "k_dcel" (double, default: 0.2)
+* "gain_at_vel" (double, default: 0.0)
+  > compensate k_ang according to the current linear velocity to keep convergence characteristic at the linear velocity, specified by this parameter, if `gain_at_vel != 0`
 * "dist_lim" (double, default: 0.5)
 * "dist_stop" (double, default: 2.0)
 * "rotate_ang" (?, default: M_PI / 4)
@@ -46,9 +45,11 @@ trajectory_tracker node controls vehicle velocity to follow given path.
 * "max_angvel" (double, default: 1.0)
 * "max_acc" (double, default: 1.0)
 * "max_angacc" (double, default: 2.0)
+* "acc_toc_factor" (double, default: 0.9)
+  > decrease max_acc by this factor in time optimal control to reduce vibration due to control delay
+* "angacc_toc_factor" (double, default: 0.9)
+  > decrease max_angacc by this factor in time optimal control to reduce vibration due to control delay
 * "path_step" (int, default: 1)
-* "distance_angle_factor" (double, default: 0.0)
-* "switchback_dist" (double, default: 0.3)
 * "goal_tolerance_dist" (double, default: 0.2)
 * "goal_tolerance_ang" (double, default: 0.1)
 * "stop_tolerance_dist" (double, default: 0.1)

@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#include <costmap_cspace/node_handle_float.h>
 #include <costmap_cspace_msgs/CSpace3D.h>
 #include <costmap_cspace_msgs/CSpace3DUpdate.h>
 
@@ -46,8 +45,8 @@
 class Costmap3DOFNode
 {
 protected:
-  ros::NodeHandle_f nh_;
-  ros::NodeHandle_f pnh_;
+  ros::NodeHandle nh_;
+  ros::NodeHandle pnh_;
   ros::Subscriber sub_map_;
   std::vector<ros::Subscriber> sub_map_overlay_;
   ros::Publisher pub_costmap_;
@@ -114,8 +113,15 @@ protected:
       const costmap_cspace::CSpace3DMsg::Ptr map,
       const costmap_cspace_msgs::CSpace3DUpdate::Ptr update)
   {
-    publishDebug(*map);
-    pub_costmap_update_.publish(*update);
+    if (update)
+    {
+      publishDebug(*map);
+      pub_costmap_update_.publish(*update);
+    }
+    else
+    {
+      ROS_WARN("Updated region of the costmap is empty. The position may be out-of-boundary, or input map is wrong.");
+    }
     return true;
   }
   void publishDebug(const costmap_cspace_msgs::CSpace3D& map)

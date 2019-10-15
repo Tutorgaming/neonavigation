@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, the neonavigation authors
+ * Copyright (c) 2014-2019, the neonavigation authors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,10 @@
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Float32.h>
+
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -79,10 +83,17 @@ geometry_msgs::Vector3 toVector3(const Eigen::Vector3f& a)
 class TrackOdometryNode
 {
 private:
+  using SyncPolicy =
+      message_filters::sync_policies::ApproximateTime<nav_msgs::Odometry, sensor_msgs::Imu>;
+
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
-  ros::Subscriber sub_odom_;
-  ros::Subscriber sub_imu_;
+
+  ros::Subscriber sub_imu_raw_;
+  std::shared_ptr<message_filters::Subscriber<nav_msgs::Odometry>> sub_odom_;
+  std::shared_ptr<message_filters::Subscriber<sensor_msgs::Imu>> sub_imu_;
+  std::shared_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
+
   ros::Subscriber sub_reset_z_;
   ros::Publisher pub_odom_;
   tf2_ros::Buffer tf_buffer_;
@@ -97,7 +108,7 @@ private:
 
   sensor_msgs::Imu imu_;
   double gyro_zero_[3];
-  double z_filter_;
+  double z_filter_timeconst_;
   double tf_tolerance_;
 
   bool debug_;
@@ -119,7 +130,16 @@ private:
   {
     odom_prev_.pose.pose.position.z = msg->data;
   }
-  void cbImu(const sensor_msgs::Imu::Ptr& msg)
+  void cbOdomImu(const nav_msgs::Odometry::ConstPtr& odom_msg, const sensor_msgs::Imu::ConstPtr& imu_msg)
+  {
+    ROS_DEBUG(
+        "Synchronized timestamp: odom %0.3f, imu %0.3f",
+        odom_msg->header.stamp.toSec(),
+        imu_msg->header.stamp.toSec());
+    cbImu(imu_msg);
+    cbOdom(odom_msg);
+  }
+  void cbImu(const sensor_msgs::Imu::ConstPtr& msg)
   {
     if (base_link_id_.size() == 0)
     {
@@ -181,7 +201,7 @@ private:
       return;
     }
   }
-  void cbOdom(const nav_msgs::Odometry::Ptr& msg)
+  void cbOdom(const nav_msgs::Odometry::ConstPtr& msg)
   {
     nav_msgs::Odometry odom = *msg;
     if (has_odom_)
@@ -248,7 +268,9 @@ private:
         v *= slip_ratio;
 
       odom.pose.pose.position = toPoint(toEigen(odom_prev_.pose.pose.position) + v);
-      odom.pose.pose.position.z *= z_filter_;
+      if (z_filter_timeconst_ > 0)
+        odom.pose.pose.position.z *= 1.0 - (dt / z_filter_timeconst_);
+
       odom.child_frame_id = base_link_id_;
       pub_odom_.publish(odom);
 
@@ -273,28 +295,66 @@ public:
     , tf_listener_(tf_buffer_)
   {
     neonavigation_common::compat::checkCompatMode();
+
     pnh_.param("without_odom", without_odom_, false);
-    if (!without_odom_)
-      sub_odom_ = nh_.subscribe("odom_raw", 64, &TrackOdometryNode::cbOdom, this);
-    sub_imu_ = neonavigation_common::compat::subscribe(
-        nh_, "imu/data",
-        nh_, "imu", 64, &TrackOdometryNode::cbImu, this);
+    if (without_odom_)
+    {
+      sub_imu_raw_ = neonavigation_common::compat::subscribe(
+          nh_, "imu/data",
+          nh_, "imu", 64, &TrackOdometryNode::cbImu, this);
+      pnh_.param("base_link_id", base_link_id_, std::string("base_link"));
+      pnh_.param("odom_id", odom_id_, std::string("odom"));
+    }
+    else
+    {
+      sub_odom_.reset(
+          new message_filters::Subscriber<nav_msgs::Odometry>(nh_, "odom_raw", 1));
+      if (neonavigation_common::compat::getCompat() == neonavigation_common::compat::current_level)
+      {
+        sub_imu_.reset(
+            new message_filters::Subscriber<sensor_msgs::Imu>(nh_, "imu/data", 1));
+      }
+      else
+      {
+        sub_imu_.reset(
+            new message_filters::Subscriber<sensor_msgs::Imu>(nh_, "imu", 1));
+      }
+
+      int sync_window;
+      pnh_.param("sync_window", sync_window, 50);
+      sync_.reset(
+          new message_filters::Synchronizer<SyncPolicy>(
+              SyncPolicy(sync_window), *sub_odom_, *sub_imu_));
+      sync_->registerCallback(boost::bind(&TrackOdometryNode::cbOdomImu, this, _1, _2));
+
+      pnh_.param("base_link_id", base_link_id_overwrite_, std::string(""));
+    }
+
     sub_reset_z_ = neonavigation_common::compat::subscribe(
         nh_, "reset_odometry_z",
         pnh_, "reset_z", 1, &TrackOdometryNode::cbResetZ, this);
     pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odom", 8);
 
-    if (!without_odom_)
+    if (pnh_.hasParam("z_filter"))
     {
-      pnh_.param("base_link_id", base_link_id_overwrite_, std::string(""));
+      z_filter_timeconst_ = -1.0;
+      double z_filter;
+      if (pnh_.getParam("z_filter", z_filter))
+      {
+        const double odom_freq = 100.0;
+        if (0.0 < z_filter && z_filter < 1.0)
+          z_filter_timeconst_ = (1.0 / odom_freq) / (1.0 - z_filter);
+      }
+      ROS_ERROR(
+          "track_odometry: ~z_filter parameter (exponential filter (1 - alpha) value) is deprecated. "
+          "Use ~z_filter_timeconst (in seconds) instead. "
+          "Treated as z_filter_timeconst=%0.6f. (negative value means disabled)",
+          z_filter_timeconst_);
     }
     else
     {
-      pnh_.param("base_link_id", base_link_id_, std::string("base_link"));
-      pnh_.param("odom_id", odom_id_, std::string("odom"));
+      pnh_.param("z_filter_timeconst", z_filter_timeconst_, -1.0);
     }
-
-    pnh_.param("z_filter", z_filter_, 0.99);
     pnh_.param("tf_tolerance", tf_tolerance_, 0.01);
     pnh_.param("use_kf", use_kf_, true);
     pnh_.param("enable_negative_slip", negative_slip_, false);

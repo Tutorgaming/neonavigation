@@ -2,6 +2,31 @@
 Changelog for package neonavigation_launch
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.3 (2019-09-10)
+------------------
+
+0.4.2 (2019-08-19)
+------------------
+
+0.4.1 (2019-08-15)
+------------------
+* trajectory_tracker: update demo params (`#352 <https://github.com/at-wat/neonavigation/issues/352>`_)
+* Drop ROS Indigo and Ubuntu Trusty support (`#310 <https://github.com/at-wat/neonavigation/issues/310>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.0 (2019-05-09)
+------------------
+* trajectory_tracker: remove unused parameters (`#274 <https://github.com/at-wat/neonavigation/issues/274>`_)
+* Contributors: Yuta Koga
+
+0.3.1 (2019-01-10)
+------------------
+* neonavigation_launch: add dependency to trajectory_tracker_rviz_plugins (`#259 <https://github.com/at-wat/neonavigation/issues/259>`_)
+* trajectory_tracker: support PathWithVelocity (`#244 <https://github.com/at-wat/neonavigation/issues/244>`_)
+* Migrate tf to tf2 (`#230 <https://github.com/at-wat/neonavigation/issues/230>`_)
+* Fix catkin package definitions (`#206 <https://github.com/at-wat/neonavigation/issues/206>`_)
+* Contributors: Atsushi Watanabe, So Jomura
+
 0.2.3 (2018-07-19)
 ------------------
 * Install sample files and nodes for demo (`#201 <https://github.com/at-wat/neonavigation/issues/201>`_)

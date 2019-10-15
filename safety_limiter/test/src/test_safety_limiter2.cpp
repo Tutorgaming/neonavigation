@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, the neonavigation authors
+ * Copyright (c) 2018-2019, the neonavigation authors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,43 +27,71 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef COSTMAP_CSPACE_NODE_HANDLE_FLOAT_H
-#define COSTMAP_CSPACE_NODE_HANDLE_FLOAT_H
-
 #include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+#include <sensor_msgs/PointCloud2.h>
 
+#include <algorithm>
 #include <string>
 
-namespace ros
+#include <gtest/gtest.h>
+
+#include <test_safety_limiter_base.h>
+
+TEST_F(SafetyLimiterTest, SafetyLimitLinearSimpleSimulationWithMargin)
 {
-class NodeHandle_f : public NodeHandle
+  const float dt = 0.02;
+  ros::Rate wait(1.0 / dt);
+
+  const float velocities[] =
+      {
+        -0.8, -0.4, 0.4, 0.8
+      };
+  for (const float vel : velocities)
+  {
+    float x = 0;
+    bool stop = false;
+    const boost::function<void(const geometry_msgs::Twist::ConstPtr&)> cb_cmd_vel =
+        [dt, &x, &stop](const geometry_msgs::Twist::ConstPtr& msg) -> void
+    {
+      if (std::abs(msg->linear.x) < 1e-4 && x > 0.5)
+        stop = true;
+
+      x += dt * msg->linear.x;
+    };
+    ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
+
+    for (int i = 0; i < lround(10.0 / dt) && ros::ok() && !stop; ++i)
+    {
+      if (vel > 0)
+        publishSinglePointPointcloud2(1.0 - x, 0, 0, "base_link", ros::Time::now());
+      else
+        publishSinglePointPointcloud2(-3.0 - x, 0, 0, "base_link", ros::Time::now());
+      publishWatchdogReset();
+      publishTwist(vel, 0.0);
+
+      wait.sleep();
+      ros::spinOnce();
+    }
+    // margin is set to 0.2
+    if (vel > 0)
+    {
+      EXPECT_GT(0.81, x);
+      EXPECT_LT(0.75, x);
+    }
+    else
+    {
+      EXPECT_LT(-0.81, x);
+      EXPECT_GT(-0.75, x);
+    }
+    sub_cmd_vel.shutdown();
+  }
+}
+
+int main(int argc, char** argv)
 {
-public:
-  void param_cast(const std::string& param_name,
-                  float& param_val, const float& default_val) const
-  {
-    double _default_val_d = default_val;
-    double _param_val_d;
+  testing::InitGoogleTest(&argc, argv);
+  ros::init(argc, argv, "test_safety_limiter");
 
-    param<double>(param_name, _param_val_d, _default_val_d);
-    param_val = _param_val_d;
-  }
-  void param_cast(const std::string& param_name,
-                  size_t& param_val, const size_t& default_val) const
-  {
-    int _default_val_d = default_val;
-    int _param_val_d;
-
-    param<int>(param_name, _param_val_d, _default_val_d);
-    param_val = _param_val_d;
-  }
-  NodeHandle_f(const std::string& ns = std::string(),
-               const M_string& remappings = M_string())
-    : NodeHandle(ns, remappings)
-  {
-  }
-};
-
-}  // namespace ros
-
-#endif  // COSTMAP_CSPACE_NODE_HANDLE_FLOAT_H
+  return RUN_ALL_TESTS();
+}

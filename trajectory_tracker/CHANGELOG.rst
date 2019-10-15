@@ -2,6 +2,49 @@
 Changelog for package trajectory_tracker
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.3 (2019-09-10)
+------------------
+
+0.4.2 (2019-08-19)
+------------------
+
+0.4.1 (2019-08-15)
+------------------
+* trajectory_tracker: update demo params (`#352 <https://github.com/at-wat/neonavigation/issues/352>`_)
+* Drop ROS Indigo and Ubuntu Trusty support (`#310 <https://github.com/at-wat/neonavigation/issues/310>`_)
+* planner_cspace: calculate path hysteresis in 3-DOF space (`#304 <https://github.com/at-wat/neonavigation/issues/304>`_)
+* Fix include directory priority (`#308 <https://github.com/at-wat/neonavigation/issues/308>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.0 (2019-05-09)
+------------------
+* trajectory_tracker: speed up simulation on rostest (`#280 <https://github.com/at-wat/neonavigation/issues/280>`_)
+* trajectory_tracker: linear velocity adaptive gain control (`#276 <https://github.com/at-wat/neonavigation/issues/276>`_)
+* trajectory_tracker: remove unused parameters (`#274 <https://github.com/at-wat/neonavigation/issues/274>`_)
+* trajectory_tracker: fix remained distance for path with two poses (`#272 <https://github.com/at-wat/neonavigation/issues/272>`_)
+* Add LICENSE file (`#270 <https://github.com/at-wat/neonavigation/issues/270>`_)
+* Support melodic (`#266 <https://github.com/at-wat/neonavigation/issues/266>`_)
+* Contributors: Atsushi Watanabe, Yuta Koga
+
+0.3.1 (2019-01-10)
+------------------
+* trajectory_tracker: fix test timeout for path with velocity (`#263 <https://github.com/at-wat/neonavigation/issues/263>`_)
+* trajectory_tracker: add timeout to the test (`#261 <https://github.com/at-wat/neonavigation/issues/261>`_)
+* trajectory_tracker: support PathWithVelocity (`#244 <https://github.com/at-wat/neonavigation/issues/244>`_)
+* trajectory_tracker: fix robot pose prediction (`#250 <https://github.com/at-wat/neonavigation/issues/250>`_)
+* trajectory_tracker: fix angular velocity limit (`#252 <https://github.com/at-wat/neonavigation/issues/252>`_)
+* trajectory_tracker: add acceleration factor parameter of time optimal control (`#249 <https://github.com/at-wat/neonavigation/issues/249>`_)
+* trajectory_tracker: fix local goal handling (`#251 <https://github.com/at-wat/neonavigation/issues/251>`_)
+* trajectory_tracker: add tolerance to InPlaceTurn (`#248 <https://github.com/at-wat/neonavigation/issues/248>`_)
+* trajectory_tracker: fix angle normalization in in-place turn mode (`#247 <https://github.com/at-wat/neonavigation/issues/247>`_)
+* trajectory_tracker: refactoring (`#239 <https://github.com/at-wat/neonavigation/issues/239>`_)
+* Fix pointer alignment style (`#233 <https://github.com/at-wat/neonavigation/issues/233>`_)
+* Migrate tf to tf2 (`#230 <https://github.com/at-wat/neonavigation/issues/230>`_)
+* trajectory_tracker: fix status output topic path (`#225 <https://github.com/at-wat/neonavigation/issues/225>`_)
+* trajectory_tracker: add tests (`#207 <https://github.com/at-wat/neonavigation/issues/207>`_)
+* Fix catkin package definitions (`#206 <https://github.com/at-wat/neonavigation/issues/206>`_)
+* Contributors: Atsushi Watanabe, So Jomura
+
 0.2.3 (2018-07-19)
 ------------------
 

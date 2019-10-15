@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, the neonavigation authors
+ * Copyright (c) 2019, the neonavigation authors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,8 +10,8 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the copyright holder nor the names of its 
- *       contributors may be used to endorse or promote products derived from 
+ *     * Neither the name of the copyright holder nor the names of its
+ *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -27,34 +27,34 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TF_PROJECTION_H
-#define TF_PROJECTION_H
+#ifndef PLANNER_CSPACE_PLANNER_3D_PATH_INTERPOLATOR_H
+#define PLANNER_CSPACE_PLANNER_3D_PATH_INTERPOLATOR_H
 
-#include <tf2/LinearMath/Transform.h>
+#include <list>
 
-#include <map>
-#include <string>
+#include <planner_cspace/cyclic_vec.h>
+#include <planner_cspace/planner_3d/rotation_cache.h>
 
-class TfProjection
+class PathInterpolator
 {
-protected:
-  std::map<std::string, std::string> frames_;
+private:
+  RotationCache rot_cache_;
+  int range_;
+  int angle_;
 
 public:
-  tf2::Stamped<tf2::Transform> project(
-      const tf2::Stamped<tf2::Transform>& trans, const tf2::Stamped<tf2::Transform>& trans_target)
+  inline void reset(
+      const float angular_resolution,
+      const int range)
   {
-    auto origin = trans.getOrigin();
-    origin.setZ(0.0);
-    tf2::Stamped<tf2::Transform> projected = trans;
-    projected.setOrigin(origin);
-
-    tf2::Stamped<tf2::Transform> output = trans_target;
-    output *= projected;
-    output.frame_id_ = frames_["target"];
-
-    return output;
+    range_ = range;
+    angle_ = std::lround(M_PI * 2 / angular_resolution);
+    rot_cache_.reset(1.0, angular_resolution, range);
   }
+  std::list<CyclicVecFloat<3, 2>> interpolate(
+      const std::list<CyclicVecInt<3, 2>>& path_grid,
+      const float interval,
+      const int local_range) const;
 };
 
-#endif  // TF_PROJECTION_H
+#endif  // PLANNER_CSPACE_PLANNER_3D_PATH_INTERPOLATOR_H

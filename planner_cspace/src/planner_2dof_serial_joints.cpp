@@ -10,8 +10,8 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the copyright holder nor the names of its 
- *       contributors may be used to endorse or promote products derived from 
+ *     * Neither the name of the copyright holder nor the names of its
+ *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -39,7 +39,6 @@
 #include <list>
 #include <vector>
 
-#include <costmap_cspace/node_handle_float.h>
 #include <planner_cspace/grid_astar.h>
 
 #include <neonavigation_common/compatibility.h>
@@ -49,11 +48,11 @@
 class planner2dofSerialJointsNode
 {
 public:
-  using Astar = GridAstar<2, 2>;
+  using Astar = GridAstar<2, 0>;
 
 private:
-  ros::NodeHandle_f nh_;
-  ros::NodeHandle_f pnh_;
+  ros::NodeHandle nh_;
+  ros::NodeHandle pnh_;
 
   ros::Publisher pub_status_;
   ros::Publisher pub_trajectory_;
@@ -74,7 +73,6 @@ private:
     float cost = 0;
     for (int i = 0; i < as_.getDim(); i++)
     {
-      // vc.cycle(vc[i], cm_.size[i]);
       cost += fabs(coef[i] * vc[i]);
     }
     return cost;
@@ -240,18 +238,12 @@ private:
     if (id[0] == -1 || id[1] == -1)
       return;
 
-    float st[2] =
-        {
-          links_[0].current_th_,
-          links_[1].current_th_
-        };
-    float en[2] =
-        {
-          static_cast<float>(traj_prev.points[0].positions[id[0]]),
-          static_cast<float>(traj_prev.points[0].positions[id[1]])
-        };
-    Astar::Vecf start(st);
-    Astar::Vecf end(en);
+    Astar::Vecf start(
+        links_[0].current_th_,
+        links_[1].current_th_);
+    Astar::Vecf end(
+        static_cast<float>(traj_prev.points[0].positions[id[0]]),
+        static_cast<float>(traj_prev.points[0].positions[id[1]]));
 
     ROS_INFO("link %s: %0.3f, %0.3f", group_.c_str(),
              traj_prev.points[0].positions[id[0]],
@@ -387,7 +379,7 @@ public:
   {
     neonavigation_common::compat::checkCompatMode();
     group_ = group_name;
-    ros::NodeHandle_f nh_group("~/" + group_);
+    ros::NodeHandle nh_group("~/" + group_);
 
     pub_trajectory_ = neonavigation_common::compat::advertise<trajectory_msgs::JointTrajectory>(
         nh_, "joint_trajectory",
@@ -418,29 +410,28 @@ public:
     has_goal_ = false;
     has_start_ = false;
 
-    int size[2] = { resolution_ * 2, resolution_ * 2 };
-    cm_.reset(Astar::Vec(size));
-    as_.reset(Astar::Vec(size));
+    cm_.reset(Astar::Vec(resolution_ * 2, resolution_ * 2));
+    as_.reset(Astar::Vec(resolution_ * 2, resolution_ * 2));
     cm_.clear(0);
 
     nh_group.param("link0_name", links_[0].name_, std::string("link0"));
-    nh_group.param_cast("link0_joint_radius", links_[0].radius_[0], 0.07f);
-    nh_group.param_cast("link0_end_radius", links_[0].radius_[1], 0.07f);
-    nh_group.param_cast("link0_length", links_[0].length_, 0.135);
-    nh_group.param_cast("link0_x", links_[0].origin_.x_, 0.22f);
-    nh_group.param_cast("link0_y", links_[0].origin_.y_, 0.0f);
-    nh_group.param_cast("link0_th", links_[0].origin_.th_, 0.0f);
-    nh_group.param_cast("link0_gain_th", links_[0].gain_.th_, -1.0f);
-    nh_group.param_cast("link0_vmax", links_[0].vmax_, 0.5f);
+    nh_group.param("link0_joint_radius", links_[0].radius_[0], 0.07f);
+    nh_group.param("link0_end_radius", links_[0].radius_[1], 0.07f);
+    nh_group.param("link0_length", links_[0].length_, 0.135f);
+    nh_group.param("link0_x", links_[0].origin_.x_, 0.22f);
+    nh_group.param("link0_y", links_[0].origin_.y_, 0.0f);
+    nh_group.param("link0_th", links_[0].origin_.th_, 0.0f);
+    nh_group.param("link0_gain_th", links_[0].gain_.th_, -1.0f);
+    nh_group.param("link0_vmax", links_[0].vmax_, 0.5f);
     nh_group.param("link1_name", links_[1].name_, std::string("link1"));
-    nh_group.param_cast("link1_joint_radius", links_[1].radius_[0], 0.07f);
-    nh_group.param_cast("link1_end_radius", links_[1].radius_[1], 0.07f);
-    nh_group.param_cast("link1_length", links_[1].length_, 0.27f);
-    nh_group.param_cast("link1_x", links_[1].origin_.x_, -0.22f);
-    nh_group.param_cast("link1_y", links_[1].origin_.y_, 0.0f);
-    nh_group.param_cast("link1_th", links_[1].origin_.th_, 0.0f);
-    nh_group.param_cast("link1_gain_th", links_[1].gain_.th_, 1.0f);
-    nh_group.param_cast("link1_vmax", links_[1].vmax_, 0.5f);
+    nh_group.param("link1_joint_radius", links_[1].radius_[0], 0.07f);
+    nh_group.param("link1_end_radius", links_[1].radius_[1], 0.07f);
+    nh_group.param("link1_length", links_[1].length_, 0.27f);
+    nh_group.param("link1_x", links_[1].origin_.x_, -0.22f);
+    nh_group.param("link1_y", links_[1].origin_.y_, 0.0f);
+    nh_group.param("link1_th", links_[1].origin_.th_, 0.0f);
+    nh_group.param("link1_gain_th", links_[1].gain_.th_, 1.0f);
+    nh_group.param("link1_vmax", links_[1].vmax_, 0.5f);
 
     links_[0].current_th_ = 0.0;
     links_[1].current_th_ = 0.0;
@@ -449,11 +440,11 @@ public:
     ROS_INFO(" - link0: %s", links_[0].name_.c_str());
     ROS_INFO(" - link1: %s", links_[1].name_.c_str());
 
-    nh_group.param_cast("link0_coef", euclid_cost_coef_[0], 1.0f);
-    nh_group.param_cast("link1_coef", euclid_cost_coef_[1], 1.5f);
+    nh_group.param("link0_coef", euclid_cost_coef_[0], 1.0f);
+    nh_group.param("link1_coef", euclid_cost_coef_[1], 1.5f);
 
-    nh_group.param_cast("weight_cost", weight_cost_, 4.0f);
-    nh_group.param_cast("expand", expand_, 0.1);
+    nh_group.param("weight_cost", weight_cost_, 4.0f);
+    nh_group.param("expand", expand_, 0.1f);
 
     std::string point_vel_mode;
     nh_group.param("point_vel_mode", point_vel_mode, std::string("prev"));
@@ -575,10 +566,9 @@ private:
       return false;
     }
     Astar::Vec d = e - s;
-    d.cycle(d[0], resolution_);
-    d.cycle(d[1], resolution_);
+    d.cycle(resolution_, resolution_);
 
-    if (cbCost(s, e, e, s) >= euclidCost(d))
+    if (cbCost(s, e, s, e) >= euclidCost(d))
     {
       path.push_back(sg);
       path.push_back(eg);
@@ -593,20 +583,21 @@ private:
     float cancel = FLT_MAX;
     if (replan_interval_ >= ros::Duration(0))
       cancel = replan_interval_.toSec();
-    if (!as_.search(s, e, path_grid,
-                    std::bind(&planner2dofSerialJointsNode::cbCost,
-                              this, std::placeholders::_1, std::placeholders::_2,
-                              std::placeholders::_3, std::placeholders::_4),
-                    std::bind(&planner2dofSerialJointsNode::cbCostEstim,
-                              this, std::placeholders::_1, std::placeholders::_2),
-                    std::bind(&planner2dofSerialJointsNode::cbSearch,
-                              this, std::placeholders::_1,
-                              std::placeholders::_2, std::placeholders::_3),
-                    std::bind(&planner2dofSerialJointsNode::cbProgress,
-                              this, std::placeholders::_1),
-                    0,
-                    cancel,
-                    true))
+    if (!as_.search(
+            s, e, path_grid,
+            std::bind(&planner2dofSerialJointsNode::cbCost,
+                      this, std::placeholders::_1, std::placeholders::_2,
+                      std::placeholders::_3, std::placeholders::_4),
+            std::bind(&planner2dofSerialJointsNode::cbCostEstim,
+                      this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&planner2dofSerialJointsNode::cbSearch,
+                      this, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3),
+            std::bind(&planner2dofSerialJointsNode::cbProgress,
+                      this, std::placeholders::_1),
+            0,
+            cancel,
+            true))
     {
       ROS_WARN("Path plan failed (goal unreachable)");
       status_.error = planner_cspace_msgs::PlannerStatus::PATH_NOT_FOUND;
@@ -630,8 +621,7 @@ private:
       if (i == 0)
         ROS_INFO("  next: %d, %d", n[0], n[1]);
       Astar::Vec n_diff = n - n_prev;
-      n_diff.cycle(n_diff[0], resolution_);
-      n_diff.cycle(n_diff[1], resolution_);
+      n_diff.cycle(resolution_, resolution_);
       Astar::Vec n2 = n_prev + n_diff;
       n_prev = n2;
 
@@ -680,7 +670,7 @@ private:
   }
   std::vector<Astar::Vec>& cbSearch(
       const Astar::Vec& p,
-      const Astar::Vec& s, const Astar::Vec& e)
+      const Astar::Vec& ss, const Astar::Vec& es)
   {
     return search_list_;
   }
@@ -693,16 +683,15 @@ private:
     const Astar::Vec d = e - s;
     return euclidCost(d);
   }
-  float cbCost(const Astar::Vec& s, Astar::Vec& e,
-               const Astar::Vec& v_goal,
-               const Astar::Vec& v_start)
+  float cbCost(
+      const Astar::Vec& s, const Astar::Vec& e,
+      const Astar::Vec& v_start, const Astar::Vec& v_goal)
   {
     if ((unsigned int)e[0] >= (unsigned int)resolution_ * 2 ||
         (unsigned int)e[1] >= (unsigned int)resolution_ * 2)
       return -1;
     Astar::Vec d = e - s;
-    d.cycle(d[0], resolution_);
-    d.cycle(d[1], resolution_);
+    d.cycle(resolution_, resolution_);
 
     float cost = euclidCost(d);
 
@@ -720,8 +709,7 @@ private:
     {
       pos[0] = lroundf(v[0]);
       pos[1] = lroundf(v[1]);
-      pos.cycleUnsigned(pos[0], resolution_);
-      pos.cycleUnsigned(pos[1], resolution_);
+      pos.cycleUnsigned(resolution_, resolution_);
       const auto c = cm_[pos];
       if (c > 99)
         return -1;
@@ -737,7 +725,7 @@ private:
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "planner_2dof_serial_joints");
-  ros::NodeHandle_f pnh("~");
+  ros::NodeHandle pnh("~");
 
   std::vector<std::shared_ptr<planner2dofSerialJointsNode>> jys;
   int n;

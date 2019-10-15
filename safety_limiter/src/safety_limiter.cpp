@@ -27,32 +27,33 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <ros/ros.h>
 #include <diagnostic_updater/diagnostic_updater.h>
-#include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/Twist.h>
+#include <ros/ros.h>
+#include <safety_limiter_msgs/SafetyLimiterStatus.h>
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-#include <pcl/point_types.h>
-#include <pcl/conversions.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 #include <algorithm>
 #include <cmath>
-#include <random>
-#include <string>
 #include <iostream>
+#include <random>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include <neonavigation_common/compatibility.h>
@@ -94,7 +95,7 @@ protected:
   ros::NodeHandle pnh_;
   ros::Publisher pub_twist_;
   ros::Publisher pub_cloud_;
-  ros::Publisher pub_debug_;
+  ros::Publisher pub_status_;
   ros::Subscriber sub_twist_;
   std::vector<ros::Subscriber> sub_clouds_;
   ros::Subscriber sub_disable_;
@@ -106,6 +107,7 @@ protected:
   geometry_msgs::Twist twist_;
   ros::Time last_cloud_stamp_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
+  bool cloud_clear_;
   double hz_;
   double timeout_;
   double disable_timeout_;
@@ -133,6 +135,7 @@ protected:
   bool has_cloud_;
   bool has_twist_;
   bool has_collision_at_now_;
+  ros::Time stuck_started_since_;
 
   constexpr static float EPSILON = 1e-6;
 
@@ -144,18 +147,20 @@ public:
     , pnh_("~")
     , tfl_(tfbuf_)
     , cloud_(new pcl::PointCloud<pcl::PointXYZ>)
+    , cloud_clear_(false)
     , last_disable_cmd_(0)
     , watchdog_stop_(false)
     , has_cloud_(false)
     , has_twist_(true)
     , has_collision_at_now_(false)
+    , stuck_started_since_(ros::Time(0))
   {
     neonavigation_common::compat::checkCompatMode();
     pub_twist_ = neonavigation_common::compat::advertise<geometry_msgs::Twist>(
         nh_, "cmd_vel",
         pnh_, "cmd_vel_out", 1, true);
     pub_cloud_ = nh_.advertise<sensor_msgs::PointCloud>("collision", 1, true);
-    pub_debug_ = nh_.advertise<sensor_msgs::PointCloud>("debug", 1, true);
+    pub_status_ = pnh_.advertise<safety_limiter_msgs::SafetyLimiterStatus>("status", 1, true);
     sub_twist_ = neonavigation_common::compat::subscribe(
         nh_, "cmd_vel_in",
         pnh_, "cmd_vel_in", 1, &SafetyLimiterNode::cbTwist, this);
@@ -247,7 +252,7 @@ public:
       v[1] = static_cast<double>(footprint_xml[i][1]);
       footprint_p.v.push_back(v);
 
-      auto dist = hypotf(v[0], v[2]);
+      const float dist = hypotf(v[0], v[1]);
       if (dist > footprint_radius_)
         footprint_radius_ = dist;
     }
@@ -281,8 +286,11 @@ protected:
   {
     ROS_WARN_THROTTLE(1.0, "safety_limiter: Watchdog timed-out");
     watchdog_stop_ = true;
+    r_lim_ = 0;
     geometry_msgs::Twist cmd_vel;
     pub_twist_.publish(cmd_vel);
+
+    diag_updater_.force_update();
   }
   void cbPredictTimer(const ros::TimerEvent& event)
   {
@@ -298,6 +306,10 @@ protected:
       pub_twist_.publish(cmd_vel);
 
       cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+      has_cloud_ = false;
+      r_lim_ = 0;
+
+      diag_updater_.force_update();
       return;
     }
 
@@ -309,7 +321,8 @@ protected:
 
     if (r_lim_current < 1.0)
       hold_off_ = now + hold_;
-    cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+
+    cloud_clear_ = true;
 
     diag_updater_.force_update();
   }
@@ -335,10 +348,10 @@ protected:
     {
       if (allow_empty_cloud_)
       {
-        return 60.0;
+        return 1.0;
       }
       ROS_WARN_THROTTLE(1.0, "safety_limiter: Empty pointcloud passed.");
-      return DBL_MAX;
+      return 0.0;
     }
 
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
@@ -355,10 +368,8 @@ protected:
     move.setIdentity();
     move_inv.setIdentity();
     sensor_msgs::PointCloud col_points;
-    sensor_msgs::PointCloud debug_points;
     col_points.header.frame_id = frame_id_;
     col_points.header.stamp = ros::Time::now();
-    debug_points.header = col_points.header;
 
     float d_col = 0;
     float yaw_col = 0;
@@ -372,20 +383,15 @@ protected:
       if (t != 0)
       {
         d_col += twist_.linear.x * dt_;
-        d_escape_remain -= twist_.linear.x * dt_;
+        d_escape_remain -= std::abs(twist_.linear.x) * dt_;
         yaw_col += twist_.angular.z * dt_;
-        yaw_escape_remain -= twist_.angular.z * dt_;
+        yaw_escape_remain -= std::abs(twist_.angular.z) * dt_;
         move = move * motion;
         move_inv = move_inv * motion_inv;
       }
 
       pcl::PointXYZ center;
       center = pcl::transformPoint(center, move_inv);
-      geometry_msgs::Point32 p;
-      p.x = center.x;
-      p.y = center.y;
-      p.z = 0.0;
-      debug_points.points.push_back(p);
 
       std::vector<int> indices;
       std::vector<float> dist;
@@ -433,30 +439,56 @@ protected:
         }
       }
     }
-    pub_debug_.publish(debug_points);
     pub_cloud_.publish(col_points);
+
+    if (has_collision_at_now_)
+    {
+      if (stuck_started_since_ == ros::Time(0))
+        stuck_started_since_ = ros::Time::now();
+    }
+    else
+    {
+      if (stuck_started_since_ != ros::Time(0))
+        stuck_started_since_ = ros::Time(0);
+    }
 
     if (!has_collision)
       return 1.0;
 
-    d_col = std::max<float>(std::abs(d_col) - d_margin_, 0.0);
-    yaw_col = std::max<float>(std::abs(yaw_col) - yaw_margin_, 0.0);
+    // delay compensation:
+    //   solve for d_compensated: d_compensated = d - delay * sqrt(2 * acc * d_compensated)
+    //     d_compensated = d + acc * delay^2 - sqrt((acc * delay^2)^2 + 2 * d * acc * delay^2)
+
+    const float delay = 1.0 * (1.0 / hz_) + dt_;
+    const float acc_dtsq[2] =
+        {
+          static_cast<float>(acc_[0] * std::pow(delay, 2)),
+          static_cast<float>(acc_[1] * std::pow(delay, 2)),
+        };
+
+    d_col = std::max<float>(
+        0.0,
+        std::abs(d_col) - d_margin_ + acc_dtsq[0] -
+            std::sqrt(std::pow(acc_dtsq[0], 2) + 2 * acc_dtsq[0] * std::abs(d_col)));
+    yaw_col = std::max<float>(
+        0.0,
+        std::abs(yaw_col) - yaw_margin_ + acc_dtsq[1] -
+            std::sqrt(std::pow(acc_dtsq[1], 2) + 2 * acc_dtsq[1] * std::abs(yaw_col)));
 
     float d_r =
-        (sqrtf(std::abs(2 * acc_[0] * d_col)) + EPSILON) / std::abs(twist_.linear.x);
+        std::sqrt(std::abs(2 * acc_[0] * d_col)) / std::abs(twist_.linear.x);
     float yaw_r =
-        (sqrtf(std::abs(2 * acc_[1] * yaw_col)) + EPSILON) / std::abs(twist_.angular.z);
+        std::sqrt(std::abs(2 * acc_[1] * yaw_col)) / std::abs(twist_.angular.z);
     if (!std::isfinite(d_r))
       d_r = 1.0;
     if (!std::isfinite(yaw_r))
       yaw_r = 1.0;
 
-    const auto r = std::min(d_r, yaw_r);
-
-    return r;
+    return std::min(d_r, yaw_r);
   }
 
-  geometry_msgs::Twist limit(const geometry_msgs::Twist& in)
+  geometry_msgs::Twist
+  limit(const geometry_msgs::Twist& in)
   {
     auto out = in;
     if (r_lim_ < 1.0 - EPSILON)
@@ -490,10 +522,12 @@ protected:
     }
     float& operator[](const int& i)
     {
+      ROS_ASSERT(i < 2);
       return c[i];
     }
     const float& operator[](const int& i) const
     {
+      ROS_ASSERT(i < 2);
       return c[i];
     }
     vec operator-(const vec& a) const
@@ -589,7 +623,7 @@ protected:
     {
       pub_twist_.publish(twist_);
     }
-    else if (ros::Time::now() - last_cloud_stamp_ > ros::Duration(timeout_) || watchdog_stop_)
+    else if (!has_cloud_ || watchdog_stop_)
     {
       geometry_msgs::Twist cmd_vel;
       pub_twist_.publish(cmd_vel);
@@ -621,6 +655,11 @@ protected:
       return;
     }
 
+    if (cloud_clear_)
+    {
+      cloud_clear_ = false;
+      cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+    }
     *cloud_ += *pc;
     last_cloud_stamp_ = msg->header.stamp;
     has_cloud_ = true;
@@ -635,11 +674,17 @@ protected:
 
   void diagnoseCollision(diagnostic_updater::DiagnosticStatusWrapper& stat)
   {
-    if (r_lim_ == 1.0)
+    safety_limiter_msgs::SafetyLimiterStatus status_msg;
+
+    if (!has_cloud_ || watchdog_stop_)
+    {
+      stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Stopped due to data timeout.");
+    }
+    else if (r_lim_ == 1.0)
     {
       stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
     }
-    else if (r_lim_ == 0.0)
+    else if (r_lim_ < EPSILON)
     {
       stat.summary(diagnostic_msgs::DiagnosticStatus::WARN,
                    (has_collision_at_now_) ?
@@ -654,6 +699,15 @@ protected:
                        "Reducing velocity to avoid collision.");
     }
     stat.addf("Velocity Limit Ratio", "%.2f", r_lim_);
+    stat.add("Pointcloud Availability", has_cloud_ ? "true" : "false");
+    stat.add("Watchdog Timeout", watchdog_stop_ ? "true" : "false");
+
+    status_msg.limit_ratio = r_lim_;
+    status_msg.is_cloud_available = has_cloud_;
+    status_msg.has_watchdog_timed_out = watchdog_stop_;
+    status_msg.stuck_started_since = stuck_started_since_;
+
+    pub_status_.publish(status_msg);
   }
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, the neonavigation authors
+ * Copyright (c) 2018-2019, the neonavigation authors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,86 +28,17 @@
  */
 
 #include <ros/ros.h>
+
+#include <diagnostic_msgs/DiagnosticStatus.h>
 #include <geometry_msgs/Twist.h>
-#include <nav_msgs/OccupancyGrid.h>
-#include <nav_msgs/Path.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
-#include <std_msgs/Empty.h>
 
 #include <algorithm>
 #include <string>
 
 #include <gtest/gtest.h>
 
-namespace
-{
-void GenerateSinglePointPointcloud2(
-    sensor_msgs::PointCloud2& cloud,
-    const float x,
-    const float y,
-    const float z)
-{
-  cloud.height = 1;
-  cloud.width = 1;
-  cloud.is_bigendian = false;
-  cloud.is_dense = false;
-  sensor_msgs::PointCloud2Modifier modifier(cloud);
-  modifier.setPointCloud2FieldsByString(1, "xyz");
-  sensor_msgs::PointCloud2Iterator<float> iter_x(cloud, "x");
-  sensor_msgs::PointCloud2Iterator<float> iter_y(cloud, "y");
-  sensor_msgs::PointCloud2Iterator<float> iter_z(cloud, "z");
-  modifier.resize(1);
-  *iter_x = x;
-  *iter_y = y;
-  *iter_z = z;
-}
-}  // namespace
-
-class SafetyLimiterTest : public ::testing::Test
-{
-protected:
-  ros::NodeHandle nh_;
-  ros::Publisher pub_cmd_vel_;
-  ros::Publisher pub_cloud_;
-  ros::Publisher pub_watchdog_;
-
-public:
-  SafetyLimiterTest()
-    : nh_()
-  {
-    pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel_in", 1);
-    pub_cloud_ = nh_.advertise<sensor_msgs::PointCloud2>("cloud", 1);
-    pub_watchdog_ = nh_.advertise<std_msgs::Empty>("watchdog_reset", 1);
-  }
-  void publishWatchdogReset()
-  {
-    std_msgs::Empty watchdog_reset;
-    pub_watchdog_.publish(watchdog_reset);
-  }
-  void publishSinglePointPointcloud2(
-      const float x,
-      const float y,
-      const float z,
-      const std::string frame_id,
-      const ros::Time stamp)
-  {
-    sensor_msgs::PointCloud2 cloud;
-    cloud.header.frame_id = frame_id;
-    cloud.header.stamp = stamp;
-    GenerateSinglePointPointcloud2(cloud, x, y, z);
-    pub_cloud_.publish(cloud);
-  }
-  void publishTwist(
-      const float lin,
-      const float ang)
-  {
-    geometry_msgs::Twist cmd_vel_out;
-    cmd_vel_out.linear.x = lin;
-    cmd_vel_out.angular.z = ang;
-    pub_cmd_vel_.publish(cmd_vel_out);
-  }
-};
+#include <test_safety_limiter_base.h>
 
 TEST_F(SafetyLimiterTest, Timeouts)
 {
@@ -121,14 +52,17 @@ TEST_F(SafetyLimiterTest, Timeouts)
 
   ros::Rate wait(10.0);
 
-  for (size_t with_cloud = 0; with_cloud < 3; ++with_cloud)
+  for (int with_cloud = 0; with_cloud < 3; ++with_cloud)
   {
-    for (size_t with_watchdog_reset = 0; with_watchdog_reset < 2; ++with_watchdog_reset)
+    for (int with_watchdog_reset = 0; with_watchdog_reset < 2; ++with_watchdog_reset)
     {
+      const std::string test_condition =
+          "with_watchdog_reset: " + std::to_string(with_watchdog_reset) +
+          ", with_cloud: " + std::to_string(with_cloud);
       ros::Duration(0.3).sleep();
 
       cmd_vel.reset();
-      for (size_t i = 0; i < 20; ++i)
+      for (int i = 0; i < 20; ++i)
       {
         ASSERT_TRUE(ros::ok());
 
@@ -155,22 +89,47 @@ TEST_F(SafetyLimiterTest, Timeouts)
         {
           if (with_watchdog_reset > 0 && with_cloud > 1)
           {
-            ASSERT_EQ(cmd_vel->linear.x, vel);
-            ASSERT_EQ(cmd_vel->linear.y, 0.0);
-            ASSERT_EQ(cmd_vel->linear.z, 0.0);
-            ASSERT_EQ(cmd_vel->angular.x, 0.0);
-            ASSERT_EQ(cmd_vel->angular.y, 0.0);
-            ASSERT_EQ(cmd_vel->angular.z, ang_vel);
+            ASSERT_EQ(cmd_vel->linear.x, vel) << test_condition;
+            ASSERT_EQ(cmd_vel->linear.y, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->linear.z, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.x, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.y, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.z, ang_vel) << test_condition;
           }
           else
           {
-            ASSERT_EQ(cmd_vel->linear.x, 0.0);
-            ASSERT_EQ(cmd_vel->linear.y, 0.0);
-            ASSERT_EQ(cmd_vel->linear.z, 0.0);
-            ASSERT_EQ(cmd_vel->angular.x, 0.0);
-            ASSERT_EQ(cmd_vel->angular.y, 0.0);
-            ASSERT_EQ(cmd_vel->angular.z, 0.0);
+            ASSERT_EQ(cmd_vel->linear.x, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->linear.y, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->linear.z, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.x, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.y, 0.0) << test_condition;
+            ASSERT_EQ(cmd_vel->angular.z, 0.0) << test_condition;
           }
+        }
+      }
+
+      ASSERT_TRUE(hasStatus()) << test_condition;
+      EXPECT_EQ(with_cloud > 1, status_->is_cloud_available) << test_condition;
+      EXPECT_EQ(status_->stuck_started_since, ros::Time(0)) << test_condition;
+
+      if (with_watchdog_reset > 0 && with_cloud > 1)
+      {
+        ASSERT_TRUE(hasDiag()) << test_condition;
+        EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+            << test_condition << ", "
+            << "message: " << diag_->status[0].message;
+
+        EXPECT_FALSE(status_->has_watchdog_timed_out) << test_condition;
+      }
+      else
+      {
+        ASSERT_TRUE(hasDiag()) << test_condition;
+        EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::ERROR, diag_->status[0].level)
+            << test_condition << ", "
+            << "message: " << diag_->status[0].message;
+        if (with_watchdog_reset == 0)
+        {
+          EXPECT_TRUE(status_->has_watchdog_timed_out) << test_condition;
         }
       }
     }
@@ -179,10 +138,10 @@ TEST_F(SafetyLimiterTest, Timeouts)
 
 TEST_F(SafetyLimiterTest, CloudBuffering)
 {
-  ros::Rate wait(35.0);
+  ros::Rate wait(60.0);
 
   // Skip initial state
-  for (size_t i = 0; i < 30 && ros::ok(); ++i)
+  for (int i = 0; i < 30 && ros::ok(); ++i)
   {
     publishSinglePointPointcloud2(0.5, 0, 0, "base_link", ros::Time::now());
     publishWatchdogReset();
@@ -207,13 +166,14 @@ TEST_F(SafetyLimiterTest, CloudBuffering)
   };
   ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-  for (size_t i = 0; i < 35 * 6 && ros::ok() && !failed; ++i)
+  for (int i = 0; i < 60 * 6 && ros::ok() && !failed; ++i)
   {
-    if (i > 5)
+    // enable check after two cycles of safety_limiter
+    if (i > 8)
       en = true;
-    // safety_limiter: 10 hz, cloud publish: 35 hz
+    // safety_limiter: 15 hz, cloud publish: 60 hz
+    // safety_limiter must check 4 buffered clouds
     // 1/3 of pointclouds have collision point
-    // safety_limiter must check 3 buffered clouds
     if ((i % 3) == 0)
       publishSinglePointPointcloud2(0.5, 0, 0, "base_link", ros::Time::now());
     else
@@ -233,7 +193,7 @@ TEST_F(SafetyLimiterTest, SafetyLimitLinear)
   ros::Rate wait(20.0);
 
   // Skip initial state
-  for (size_t i = 0; i < 10 && ros::ok(); ++i)
+  for (int i = 0; i < 10 && ros::ok(); ++i)
   {
     publishSinglePointPointcloud2(0.5, 0, 0, "base_link", ros::Time::now());
     publishWatchdogReset();
@@ -261,17 +221,84 @@ TEST_F(SafetyLimiterTest, SafetyLimitLinear)
     };
     ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-    for (size_t i = 0; i < 10 && ros::ok() && !failed; ++i)
+    for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
     {
       if (i > 5)
         en = true;
       publishSinglePointPointcloud2(0.5, 0, 0, "base_link", ros::Time::now());
       publishWatchdogReset();
-      publishTwist(vel, (i % 3) * 0.01);
+      publishTwist(vel, ((i % 5) - 2.0) * 0.01);
 
       wait.sleep();
       ros::spinOnce();
     }
+    ASSERT_TRUE(hasDiag());
+    EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+        << "message: " << diag_->status[0].message;
+
+    ASSERT_TRUE(hasStatus());
+    EXPECT_TRUE(status_->is_cloud_available);
+    EXPECT_FALSE(status_->has_watchdog_timed_out);
+    EXPECT_EQ(status_->stuck_started_since, ros::Time(0));
+
+    ASSERT_TRUE(received);
+    sub_cmd_vel.shutdown();
+  }
+}
+
+TEST_F(SafetyLimiterTest, SafetyLimitLinearBackward)
+{
+  ros::Rate wait(20.0);
+
+  // Skip initial state
+  for (int i = 0; i < 10 && ros::ok(); ++i)
+  {
+    publishSinglePointPointcloud2(-2.5, 0, 0, "base_link", ros::Time::now());
+    publishWatchdogReset();
+
+    wait.sleep();
+    ros::spinOnce();
+  }
+
+  for (float vel = 0.0; vel > -2.0; vel -= 0.4)
+  {
+    // 1.0 m/ss, obstacle at -2.5 m: limited to -1.0 m/s
+    bool received = false;
+    bool failed = false;
+    bool en = false;
+    const boost::function<void(const geometry_msgs::Twist::ConstPtr&)> cb_cmd_vel =
+        [&received, &failed, &en, vel](const geometry_msgs::Twist::ConstPtr& msg) -> void
+    {
+      if (!en)
+        return;
+      const float expected_vel = std::max<float>(vel, -1.0);
+      received = true;
+      failed = true;
+      ASSERT_NEAR(msg->linear.x, expected_vel, 1e-1);
+      failed = false;
+    };
+    ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
+
+    for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
+    {
+      if (i > 5)
+        en = true;
+      publishSinglePointPointcloud2(-2.5, 0, 0, "base_link", ros::Time::now());
+      publishWatchdogReset();
+      publishTwist(vel, ((i % 5) - 2.0) * 0.01);
+
+      wait.sleep();
+      ros::spinOnce();
+    }
+    ASSERT_TRUE(hasDiag());
+    EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+        << "message: " << diag_->status[0].message;
+
+    ASSERT_TRUE(hasStatus());
+    EXPECT_TRUE(status_->is_cloud_available);
+    EXPECT_FALSE(status_->has_watchdog_timed_out);
+    EXPECT_EQ(status_->stuck_started_since, ros::Time(0));
+
     ASSERT_TRUE(received);
     sub_cmd_vel.shutdown();
   }
@@ -282,7 +309,7 @@ TEST_F(SafetyLimiterTest, SafetyLimitLinearEscape)
   ros::Rate wait(20.0);
 
   // Skip initial state
-  for (size_t i = 0; i < 10 && ros::ok(); ++i)
+  for (int i = 0; i < 10 && ros::ok(); ++i)
   {
     publishSinglePointPointcloud2(-0.05, 0, 0, "base_link", ros::Time::now());
     publishWatchdogReset();
@@ -306,16 +333,20 @@ TEST_F(SafetyLimiterTest, SafetyLimitLinearEscape)
       received = true;
       failed = true;
       if (vel < 0)
+      {
         // escaping from collision must be allowed
         ASSERT_NEAR(msg->linear.x, vel, 1e-1);
+      }
       else
+      {
         // colliding motion must be limited
         ASSERT_NEAR(msg->linear.x, 0.0, 1e-1);
+      }
       failed = false;
     };
     ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-    for (size_t i = 0; i < 10 && ros::ok() && !failed; ++i)
+    for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
     {
       if (i > 5)
         en = true;
@@ -326,6 +357,24 @@ TEST_F(SafetyLimiterTest, SafetyLimitLinearEscape)
       wait.sleep();
       ros::spinOnce();
     }
+    if (vel < 0)
+    {
+      ASSERT_TRUE(hasDiag());
+      EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+          << "message: " << diag_->status[0].message;
+    }
+    else
+    {
+      ASSERT_TRUE(hasDiag());
+      EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::WARN, diag_->status[0].level)
+          << "message: " << diag_->status[0].message;
+    }
+
+    ASSERT_TRUE(hasStatus());
+    EXPECT_TRUE(status_->is_cloud_available);
+    EXPECT_FALSE(status_->has_watchdog_timed_out);
+    EXPECT_NE(status_->stuck_started_since, ros::Time(0));
+
     ASSERT_TRUE(received);
     sub_cmd_vel.shutdown();
   }
@@ -336,7 +385,7 @@ TEST_F(SafetyLimiterTest, SafetyLimitAngular)
   ros::Rate wait(20.0);
 
   // Skip initial state
-  for (size_t i = 0; i < 10 && ros::ok(); ++i)
+  for (int i = 0; i < 10 && ros::ok(); ++i)
   {
     publishSinglePointPointcloud2(-1, -1, 0, "base_link", ros::Time::now());
     publishWatchdogReset();
@@ -364,17 +413,26 @@ TEST_F(SafetyLimiterTest, SafetyLimitAngular)
     };
     ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-    for (size_t i = 0; i < 10 && ros::ok() && !failed; ++i)
+    for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
     {
       if (i > 5)
         en = true;
-      publishSinglePointPointcloud2(-1, -1, 0, "base_link", ros::Time::now());
+      publishSinglePointPointcloud2(-1, -1.1, 0, "base_link", ros::Time::now());
       publishWatchdogReset();
       publishTwist((i % 3) * 0.01, vel);
 
       wait.sleep();
       ros::spinOnce();
     }
+    ASSERT_TRUE(hasDiag());
+    EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+        << "message: " << diag_->status[0].message;
+
+    ASSERT_TRUE(hasStatus());
+    EXPECT_TRUE(status_->is_cloud_available);
+    EXPECT_FALSE(status_->has_watchdog_timed_out);
+    EXPECT_EQ(status_->stuck_started_since, ros::Time(0));
+
     ASSERT_TRUE(received);
     sub_cmd_vel.shutdown();
   }
@@ -385,7 +443,7 @@ TEST_F(SafetyLimiterTest, SafetyLimitAngularEscape)
   ros::Rate wait(20.0);
 
   // Skip initial state
-  for (size_t i = 0; i < 10 && ros::ok(); ++i)
+  for (int i = 0; i < 10 && ros::ok(); ++i)
   {
     publishSinglePointPointcloud2(-1, -0.09, 0, "base_link", ros::Time::now());
     publishWatchdogReset();
@@ -409,16 +467,20 @@ TEST_F(SafetyLimiterTest, SafetyLimitAngularEscape)
       received = true;
       failed = true;
       if (vel < 0)
+      {
         // escaping from collision must be allowed
         ASSERT_NEAR(msg->angular.z, vel, 1e-1);
+      }
       else
+      {
         // colliding motion must be limited
         ASSERT_NEAR(msg->angular.z, 0.0, 1e-1);
+      }
       failed = false;
     };
     ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-    for (size_t i = 0; i < 10 && ros::ok() && !failed; ++i)
+    for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
     {
       if (i > 5)
         en = true;
@@ -429,6 +491,24 @@ TEST_F(SafetyLimiterTest, SafetyLimitAngularEscape)
       wait.sleep();
       ros::spinOnce();
     }
+    if (vel < 0)
+    {
+      ASSERT_TRUE(hasDiag());
+      EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+          << "message: " << diag_->status[0].message;
+    }
+    else
+    {
+      ASSERT_TRUE(hasDiag());
+      EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::WARN, diag_->status[0].level)
+          << "message: " << diag_->status[0].message;
+    }
+
+    ASSERT_TRUE(hasStatus());
+    EXPECT_TRUE(status_->is_cloud_available);
+    EXPECT_FALSE(status_->has_watchdog_timed_out);
+    EXPECT_NE(status_->stuck_started_since, ros::Time(0));
+
     ASSERT_TRUE(received);
     sub_cmd_vel.shutdown();
   }
@@ -456,7 +536,7 @@ TEST_F(SafetyLimiterTest, NoCollision)
       };
       ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
 
-      for (size_t i = 0; i < 10 && ros::ok() && !failed; ++i)
+      for (int i = 0; i < 10 && ros::ok() && !failed; ++i)
       {
         if (i > 5)
           en = true;
@@ -468,8 +548,69 @@ TEST_F(SafetyLimiterTest, NoCollision)
         ros::spinOnce();
       }
       ASSERT_TRUE(received);
+
+      ASSERT_TRUE(hasDiag());
+      EXPECT_EQ(diagnostic_msgs::DiagnosticStatus::OK, diag_->status[0].level)
+          << "message: " << diag_->status[0].message;
+
+      ASSERT_TRUE(hasStatus());
+      EXPECT_EQ(1.0, status_->limit_ratio);
+      EXPECT_TRUE(status_->is_cloud_available);
+      EXPECT_FALSE(status_->has_watchdog_timed_out);
+      EXPECT_EQ(status_->stuck_started_since, ros::Time(0));
+
       sub_cmd_vel.shutdown();
     }
+  }
+}
+
+TEST_F(SafetyLimiterTest, SafetyLimitLinearSimpleSimulation)
+{
+  const float dt = 0.02;
+  ros::Rate wait(1.0 / dt);
+
+  const float velocities[] =
+      {
+        -0.8, -0.5, 0.5, 0.8
+      };
+  for (const float vel : velocities)
+  {
+    float x = 0;
+    bool stop = false;
+    const boost::function<void(const geometry_msgs::Twist::ConstPtr&)> cb_cmd_vel =
+        [dt, &x, &stop](const geometry_msgs::Twist::ConstPtr& msg) -> void
+    {
+      if (std::abs(msg->linear.x) < 1e-4 && x > 0.5)
+        stop = true;
+
+      x += dt * msg->linear.x;
+    };
+    ros::Subscriber sub_cmd_vel = nh_.subscribe("cmd_vel", 1, cb_cmd_vel);
+
+    for (int i = 0; i < lround(10.0 / dt) && ros::ok() && !stop; ++i)
+    {
+      if (vel > 0)
+        publishSinglePointPointcloud2(1.0 - x, 0, 0, "base_link", ros::Time::now());
+      else
+        publishSinglePointPointcloud2(-3.0 - x, 0, 0, "base_link", ros::Time::now());
+
+      publishWatchdogReset();
+      publishTwist(vel, 0.0);
+
+      wait.sleep();
+      ros::spinOnce();
+    }
+    if (vel > 0)
+    {
+      EXPECT_GT(1.01, x);
+      EXPECT_LT(0.95, x);
+    }
+    else
+    {
+      EXPECT_LT(-1.01, x);
+      EXPECT_GT(-0.95, x);
+    }
+    sub_cmd_vel.shutdown();
   }
 }
 

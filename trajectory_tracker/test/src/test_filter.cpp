@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, the mcl_3dl authors
+ * Copyright (c) 2016-2017, the neonavigation authors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,8 +10,8 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the copyright holder nor the names of its 
- *       contributors may be used to endorse or promote products derived from 
+ *     * Neither the name of the copyright holder nor the names of its
+ *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -31,13 +31,13 @@
 
 #include <gtest/gtest.h>
 
-#include <filter.h>
+#include <trajectory_tracker/filter.h>
 
 TEST(Filter, LPFCharacteristic)
 {
   for (int time_const = 20; time_const < 100; time_const += 20)
   {
-    Filter lpf(Filter::FILTER_LPF, time_const, 0.0);
+    trajectory_tracker::Filter lpf(trajectory_tracker::Filter::FILTER_LPF, time_const, 0.0);
     ASSERT_LT(fabs(lpf.get()), 1e-6);
 
     // Input step function
@@ -70,8 +70,8 @@ TEST(Filter, HPFCharacteristic)
 {
   for (int time_const = 20; time_const < 100; time_const += 20)
   {
-    Filter lpf(Filter::FILTER_LPF, time_const, 0.0);
-    Filter hpf(Filter::FILTER_HPF, time_const, 0.0);
+    trajectory_tracker::Filter lpf(trajectory_tracker::Filter::FILTER_LPF, time_const, 0.0);
+    trajectory_tracker::Filter hpf(trajectory_tracker::Filter::FILTER_HPF, time_const, 0.0);
 
     // Input step function
     for (int i = 0; i < time_const * 10; ++i)
@@ -94,8 +94,8 @@ TEST(Filter, AugleLPF)
     const float start1 = zero + 0.5;
     const float end1 = zero + M_PI * 2.0 - 0.5;
 
-    Filter lpf(Filter::FILTER_LPF, 10, start1);
-    Filter lpf_angle(Filter::FILTER_LPF, 10, start1, true);
+    trajectory_tracker::Filter lpf(trajectory_tracker::Filter::FILTER_LPF, 10, start1);
+    trajectory_tracker::Filter lpf_angle(trajectory_tracker::Filter::FILTER_LPF, 10, start1, true);
     ASSERT_LT(fabs(lpf.get() - start1), 1e-6);
     ASSERT_LT(fabs(lpf_angle.get() - start1), 1e-6);
 

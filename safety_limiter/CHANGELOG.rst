@@ -2,6 +2,41 @@
 Changelog for package safety_limiter
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.3 (2019-09-10)
+------------------
+* safety_limiter: fix diagnostics warning condition (`#374 <https://github.com/at-wat/neonavigation/issues/374>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.2 (2019-08-19)
+------------------
+
+0.4.1 (2019-08-15)
+------------------
+* safety_limiter: increase simulation test publish rate (`#320 <https://github.com/at-wat/neonavigation/issues/320>`_)
+* safety_limiter: add simulation test conditions for backward motion (`#319 <https://github.com/at-wat/neonavigation/issues/319>`_)
+* safety_limiter: add delay compensation (`#316 <https://github.com/at-wat/neonavigation/issues/316>`_)
+* safety_limiter: fix footprint radius calculation (`#317 <https://github.com/at-wat/neonavigation/issues/317>`_)
+* Drop ROS Indigo and Ubuntu Trusty support (`#310 <https://github.com/at-wat/neonavigation/issues/310>`_)
+* Contributors: Atsushi Watanabe, Yuta Koga
+
+0.4.0 (2019-05-09)
+------------------
+* safety_limiter: fix backward motion limit (`#292 <https://github.com/at-wat/neonavigation/issues/292>`_)
+* safety_limiter: fix CloudBuffering test start timing (`#279 <https://github.com/at-wat/neonavigation/issues/279>`_)
+* Fix package dependencies (`#268 <https://github.com/at-wat/neonavigation/issues/268>`_)
+* Contributors: Atsushi Watanabe, Yuta Koga
+
+0.3.1 (2019-01-10)
+------------------
+* safety_limiter: increase tolerance of the test (`#243 <https://github.com/at-wat/neonavigation/issues/243>`_)
+* Fix pointer alignment style (`#233 <https://github.com/at-wat/neonavigation/issues/233>`_)
+* Migrate tf to tf2 (`#230 <https://github.com/at-wat/neonavigation/issues/230>`_)
+* safety_limiter: add diagnostics to safety_limiter node  (`#227 <https://github.com/at-wat/neonavigation/issues/227>`_)
+* safety_limiter: allow escape motion from collision (`#221 <https://github.com/at-wat/neonavigation/issues/221>`_)
+* safety_limiter: fix first time step of collision prediction (`#222 <https://github.com/at-wat/neonavigation/issues/222>`_)
+* Fix catkin package definitions (`#206 <https://github.com/at-wat/neonavigation/issues/206>`_)
+* Contributors: Atsushi Watanabe, So Jomura, Yuta Koga
+
 0.2.3 (2018-07-19)
 ------------------
 

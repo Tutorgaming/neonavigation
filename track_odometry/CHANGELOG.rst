@@ -2,6 +2,35 @@
 Changelog for package track_odometry
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.3 (2019-09-10)
+------------------
+
+0.4.2 (2019-08-19)
+------------------
+
+0.4.1 (2019-08-15)
+------------------
+* track_odometry: synchronize Odometry and IMU (`#363 <https://github.com/at-wat/neonavigation/issues/363>`_)
+* Drop ROS Indigo and Ubuntu Trusty support (`#310 <https://github.com/at-wat/neonavigation/issues/310>`_)
+* Fix include directory priority (`#308 <https://github.com/at-wat/neonavigation/issues/308>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.0 (2019-05-09)
+------------------
+* track_odometry: fix z_filter unit to seconds (`#290 <https://github.com/at-wat/neonavigation/issues/290>`_)
+* track_odometry: add project_posture option to tf_projection node (`#286 <https://github.com/at-wat/neonavigation/issues/286>`_)
+* track_odometry: refactor tf_projection (`#285 <https://github.com/at-wat/neonavigation/issues/285>`_)
+* track_odometry: set missing child_frame_id in tf_projection (`#283 <https://github.com/at-wat/neonavigation/issues/283>`_)
+* Contributors: Atsushi Watanabe, Yuta Koga
+
+0.3.1 (2019-01-10)
+------------------
+* Fix pointer alignment style (`#233 <https://github.com/at-wat/neonavigation/issues/233>`_)
+* Migrate tf to tf2 (`#230 <https://github.com/at-wat/neonavigation/issues/230>`_)
+* track_odometry: add test (`#208 <https://github.com/at-wat/neonavigation/issues/208>`_)
+* Fix catkin package definitions (`#206 <https://github.com/at-wat/neonavigation/issues/206>`_)
+* Contributors: Atsushi Watanabe, So Jomura
+
 0.2.3 (2018-07-19)
 ------------------
 * Fix test names (`#202 <https://github.com/at-wat/neonavigation/issues/202>`_)

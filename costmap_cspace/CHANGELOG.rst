@@ -2,6 +2,34 @@
 Changelog for package costmap_cspace
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.3 (2019-09-10)
+------------------
+* costmap_cspace: fix memory corruption (`#381 <https://github.com/at-wat/neonavigation/issues/381>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.2 (2019-08-19)
+------------------
+
+0.4.1 (2019-08-15)
+------------------
+* costmap_cspace: fix costmap output for out-of-boundary overlay map (`#361 <https://github.com/at-wat/neonavigation/issues/361>`_)
+* Drop ROS Indigo and Ubuntu Trusty support (`#310 <https://github.com/at-wat/neonavigation/issues/310>`_)
+* Fix include directory priority (`#308 <https://github.com/at-wat/neonavigation/issues/308>`_)
+* planner_cspace, costmap_cspace: minor refactoring (`#305 <https://github.com/at-wat/neonavigation/issues/305>`_)
+* Contributors: Atsushi Watanabe
+
+0.4.0 (2019-05-09)
+------------------
+* costmap_cspace: add const begin/end to PointcloudAccumurator (`#294 <https://github.com/at-wat/neonavigation/issues/294>`_)
+* Contributors: Naotaka Hatao
+
+0.3.1 (2019-01-10)
+------------------
+* Fix pointer alignment style (`#233 <https://github.com/at-wat/neonavigation/issues/233>`_)
+* Migrate tf to tf2 (`#230 <https://github.com/at-wat/neonavigation/issues/230>`_)
+* Fix catkin package definitions (`#206 <https://github.com/at-wat/neonavigation/issues/206>`_)
+* Contributors: Atsushi Watanabe, So Jomura
+
 0.2.3 (2018-07-19)
 ------------------
 * Fix test names (`#202 <https://github.com/at-wat/neonavigation/issues/202>`_)
